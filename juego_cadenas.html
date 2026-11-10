@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Juego de cadenas</title>
+<style>
+  :root {
+    --fondo: #e6edf5; --tinta: #14213d; --tarjeta: #f7fafd; --linea: #b9c6d8;
+    --ficha: #ffc53d; --borde: #b9820a; --texto-ficha: #3a2600;
+    --ok: #0f8a7a; --mal: #c81d4e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fondo: #101a2e; --tinta: #e8eef9; --tarjeta: #18253f; --linea: #2c3d5f;
+      --ficha: #f2b632; --borde: #8a5f08; --texto-ficha: #2b1c00;
+      --ok: #38c9b4; --mal: #ff6b8f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
+    background: var(--fondo); color: var(--tinta);
+    font: 17px/1.5 system-ui, "Segoe UI", sans-serif;
+  }
+  .juego {
+    width: 100%; max-width: 480px; padding: 24px;
+    background: var(--tarjeta); border: 2px solid var(--linea); border-radius: 16px;
+  }
+  h1 { font-family: Georgia, serif; font-size: 2rem; margin: 0 0 12px; }
+  .estado { display: flex; justify-content: space-between; font-size: .9rem; }
+  .barra { height: 8px; background: var(--linea); border-radius: 6px; margin: 8px 0 18px; overflow: hidden; }
+  .barra div { height: 100%; width: 0; background: var(--ok); transition: width .4s; }
+  .etiqueta {
+    display: inline-block; padding: 2px 10px; border-radius: 6px;
+    background: var(--ficha); color: var(--texto-ficha); font-weight: 700; font-size: .85rem;
+  }
+  #pregunta { font-size: 1.2rem; font-weight: 600; margin: 10px 0 16px; }
+  #vista { min-height: 3.4rem; margin-bottom: 18px; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+  .ficha {
+    width: 2.3rem; height: 2.8rem; display: grid; place-items: center;
+    background: var(--ficha); color: var(--texto-ficha);
+    font: 700 1.5rem Georgia, serif; border-radius: 6px; box-shadow: 0 4px 0 var(--borde);
+  }
+  .ficha.vacia { background: transparent; border: 2px dashed var(--tinta); box-shadow: none; }
+  .espacio { width: 1rem; }
+  .codigo {
+    width: 100%; padding: 12px 14px; border-radius: 8px; background: var(--fondo);
+    font: 600 1.1rem ui-monospace, Menlo, Consolas, monospace;
+  }
+  .fila { display: flex; gap: 8px; }
+  input {
+    flex: 1; min-width: 0; padding: 12px; font: inherit; font-size: 1.1rem;
+    color: var(--tinta); background: var(--fondo);
+    border: 2px solid var(--tinta); border-radius: 10px;
+  }
+  button {
+    padding: 12px 18px; font: inherit; font-weight: 700; cursor: pointer;
+    color: var(--tarjeta); background: var(--tinta);
+    border: 2px solid var(--tinta); border-radius: 10px;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  input:focus-visible, button:focus-visible { outline: 3px solid var(--ok); outline-offset: 2px; }
+  #mensaje { min-height: 3.2em; margin-top: 14px; font-weight: 700; }
+  #mensaje.ok { color: var(--ok); }
+  #mensaje.mal { color: var(--mal); }
+  .operacion { display: block; margin-top: 4px; font: 400 .95rem ui-monospace, Menlo, Consolas, monospace; color: var(--tinta); }
+  .grande { font: 700 3.5rem Georgia, serif; margin: 0; }
+  @media (prefers-reduced-motion: reduce) { .barra div { transition: none; } }
+</style>
+</head>
+<body>
+    x
+<body>
+  <h1>Juego de cadenas</h1>
+  <p>Puntos: <b id="puntos">0</b></p>
+  <p id="pregunta"></p>
+  <div id="palabra"></div>
+  <input id="respuesta" autocomplete="off">
+  <button onclick="comprobar()">Comprobar</button>
+  <p id="mensaje"></p>
+
+<script>
+const desafios = [
+  { tipo: "Completar", pregunta: "Completa la palabra", texto: "c_mput_dora", respuesta: "computadora", operacion: '"c" + "o" + "mput" + "a" + "dora"' },
+  { tipo: "Encontrar", pregunta: "¿Cuántas veces aparece la letra a?", texto: "banana", respuesta: "3", operacion: '"banana".split("a").length - 1' },
+  { tipo: "Modificar", pregunta: "Escribe la palabra en mayúsculas", texto: "hola", respuesta: "HOLA", operacion: '"hola".toUpperCase()' },
+  { tipo: "Comparar", pregunta: "¿Son iguales? Escribe si o no", texto: '"Casa" y "casa"', respuesta: "no", operacion: '"Casa" === "casa"  // false' },
+  { tipo: "Construir", pregunta: "Une las partes: Hola + espacio + mundo", texto: '"Hola", " ", "mundo"', respuesta: "Hola mundo", operacion: '"Hola" + " " + "mundo"' }
+];
+
+let actual = 0;
+let puntos = 0;
+
+function mostrar() {
+  const d = desafios[actual];
+  document.getElementById("pregunta").textContent = d.tipo + ": " + d.pregunta;
+  document.getElementById("palabra").textContent = d.texto;
+  document.getElementById("respuesta").value = "";
+  document.getElementById("respuesta").focus();
+}
+
+function comprobar() {
+  const d = desafios[actual];
+  const escrito = document.getElementById("respuesta").value.trim();
+  const mensaje = document.getElementById("mensaje");
+
+  const correcto = d.tipo === "Modificar"
+    ? escrito === d.respuesta
+    : escrito.toLowerCase() === d.respuesta.toLowerCase();
+
+  if (correcto) {
+    puntos += 10;
+    mensaje.textContent = "¡Correcto!" 
+  } else {
+    mensaje.textContent = "Incorrecto."
+  }
+  document.getElementById("puntos").textContent = puntos;
+
+  actual++;
+  if (actual < desafios.length) {
+    setTimeout(mostrar, 2000);
+  } else {
+    setTimeout(() => {
+      document.body.innerHTML = "<h1>Fin del juego</h1><p>Puntaje final: " + puntos + " de " + desafios.length * 10 + "</p>";
+    }, 2000);
+  }
+}
+
+document.getElementById("respuesta").addEventListener("keydown", e => {
+  if (e.key === "Enter") comprobar();
+});
+
+mostrar();
+</script>
+</body>
+</html>
